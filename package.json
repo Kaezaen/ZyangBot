@@ -19,7 +19,10 @@
   "type": "module",
   "dependencies": {
     "discord.js": "^14.26.4",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "picocolors": "^1.1.1",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
