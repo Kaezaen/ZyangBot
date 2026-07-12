@@ -7,10 +7,27 @@ services:
       LAVALINK_URL: lavalink:2333
     depends_on:
       lavalink:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
+    healthcheck:
+      # Liveness: the metrics server responds -> the process and event loop
+      # are alive. wget ships with the alpine (busybox) base image.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Cap memory to protect the host from OOM; no CPU cap so playback is not
+    # throttled. Rotate logs so stdout cannot fill the disk over time.
+    mem_limit: 512m
+    mem_reservation: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4-alpine
@@ -19,11 +36,33 @@ services:
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
     volumes:
+      # application.yml only (read-only). Plugins are NOT mounted on a named
+      # volume: the Lavalink image runs as uid 322 but a fresh named volume at
+      # /opt/Lavalink/plugins (a path absent from the image) is created
+      # root-owned, so Lavalink cannot write the downloaded jars. Letting the
+      # container own its plugins dir avoids that; jars re-download on recreate
+      # (a few seconds) and persist across restarts.
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
-      - lavalink-plugins:/opt/Lavalink/plugins
     expose:
       - "2333"
     restart: unless-stopped
-
-volumes:
-  lavalink-plugins:
+    healthcheck:
+      # Readiness: Lavalink (Spring Boot) only binds port 2333 once the server
+      # is up, so a TCP check is a robust "ready to accept clients" signal.
+      # Avoids Lavalink's auth-required HTTP endpoints and busybox --header
+      # inconsistencies. start_period is generous because the first boot
+      # downloads plugins from Maven.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2333 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    # The JVM is memory-hungry; 1g leaves headroom for the bot and OS on a 2 GB
+    # host. The JVM is container-aware and sizes its heap from this limit.
+    mem_limit: 1g
+    mem_reservation: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
