@@ -12,13 +12,15 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
-      # Liveness: the metrics server responds -> the process and event loop
-      # are alive. wget ships with the alpine (busybox) base image.
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/metrics || exit 1"]
+      # Readiness: /health returns 200 only when both Discord and Lavalink are
+      # connected (503 otherwise), so the container is "healthy" only once it can
+      # actually serve. wget ships with the alpine (busybox) base image and exits
+      # non-zero on a 503.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 30s
     # Cap memory to protect the host from OOM; no CPU cap so playback is not
     # throttled. Rotate logs so stdout cannot fill the disk over time.
     mem_limit: 512m
@@ -66,3 +68,46 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Optional monitoring stack. Not started by default (keeps the 2 GB host free);
+  # run with:  docker compose --profile observability up -d
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: ["observability"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    expose:
+      - "9090"
+    restart: unless-stopped
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  prometheus-data:
+  grafana-data:

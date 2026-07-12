@@ -28,10 +28,20 @@ describe("attachQueueAdvancement", () => {
   function setup() {
     const player = new FakePlayer();
     let advances = 0;
-    attachQueueAdvancement(player as PlayerEventSource, () => {
-      advances += 1;
+    let exceptions = 0;
+    attachQueueAdvancement(player as PlayerEventSource, {
+      onAdvance: () => {
+        advances += 1;
+      },
+      onException: () => {
+        exceptions += 1;
+      },
     });
-    return { player, getAdvances: () => advances };
+    return {
+      player,
+      getAdvances: () => advances,
+      getExceptions: () => exceptions,
+    };
   }
 
   it("advances exactly once when a failed track emits exception then end(loadFailed)", () => {
@@ -52,12 +62,13 @@ describe("attachQueueAdvancement", () => {
     assert.equal(getAdvances(), 1);
   });
 
-  it("does not advance on an exception alone", () => {
-    const { player, getAdvances } = setup();
+  it("does not advance on an exception alone, but notifies onException", () => {
+    const { player, getAdvances, getExceptions } = setup();
 
     player.emit("exception", { exception: new Error("boom") });
 
     assert.equal(getAdvances(), 0);
+    assert.equal(getExceptions(), 1);
   });
 
   it("does not advance on caller-triggered end reasons", () => {

@@ -1,7 +1,11 @@
 import type { ChatInputCommandInteraction, Interaction } from "discord.js";
 import { commandsByName } from "../../commands/index.js";
 import { logger } from "../../core/logger/index.js";
-import { recordCommandInteraction } from "../../services/metrics.js";
+import {
+  recordCommandError,
+  recordCommandInteraction,
+  startCommandTimer,
+} from "../../services/metrics.js";
 import { handleMusicControl } from "./handleMusicControl.js";
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
@@ -21,16 +25,20 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
   }
 
   recordCommandInteraction(interaction.commandName);
+  const stopTimer = startCommandTimer(interaction.commandName);
 
   try {
     await command.execute(interaction);
   } catch (error) {
+    recordCommandError(interaction.commandName);
     logger.error(
       { err: error, command: interaction.commandName, guildId: interaction.guildId },
       "Command execution failed",
     );
 
     await reportCommandFailure(interaction);
+  } finally {
+    stopTimer();
   }
 }
 

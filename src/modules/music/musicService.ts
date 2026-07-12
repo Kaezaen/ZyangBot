@@ -2,7 +2,12 @@ import type { Client } from "discord.js";
 import { Connectors, type Player, Shoukaku } from "shoukaku";
 import { config } from "../../core/config/index.js";
 import { logger } from "../../core/logger/index.js";
-import { setActiveMusicQueues } from "../../services/metrics.js";
+import {
+  recordPlaybackError,
+  recordTrackPlayed,
+  setActiveMusicQueues,
+  setLavalinkConnected,
+} from "../../services/metrics.js";
 import { GuildQueue } from "./guildQueue.js";
 import { attachQueueAdvancement } from "./playerEvents.js";
 import type { Track } from "./track.js";
@@ -28,6 +33,7 @@ export class MusicService {
   private readonly queues = new Map<string, GuildQueue>();
   private readonly attachedPlayers = new Set<string>();
   private shoukaku: Shoukaku | undefined;
+  private lavalinkConnected = false;
 
   initialize(client: Client): void {
     if (this.shoukaku) {
@@ -52,6 +58,8 @@ export class MusicService {
 
     this.shoukaku.on("ready", (name) => {
       logger.info({ node: name }, "Lavalink node connected");
+      this.lavalinkConnected = true;
+      setLavalinkConnected(true);
     });
 
     this.shoukaku.on("error", (name, error) => {
@@ -60,6 +68,8 @@ export class MusicService {
 
     this.shoukaku.on("close", (name, code, reason) => {
       logger.warn({ node: name, code, reason }, "Lavalink node disconnected");
+      this.lavalinkConnected = false;
+      setLavalinkConnected(false);
     });
   }
 
@@ -193,6 +203,10 @@ export class MusicService {
     return this.getManager().players.get(guildId)?.paused ?? false;
   }
 
+  isLavalinkConnected(): boolean {
+    return this.lavalinkConnected;
+  }
+
   /**
    * Disconnects every active voice connection and clears all in-memory state.
    * Called during graceful shutdown so Discord sees the bot leave immediately
@@ -263,8 +277,9 @@ export class MusicService {
 
     this.attachedPlayers.add(player.guildId);
 
-    attachQueueAdvancement(player, () => {
-      void this.handleTrackEnd(player.guildId);
+    attachQueueAdvancement(player, {
+      onAdvance: () => void this.handleTrackEnd(player.guildId),
+      onException: recordPlaybackError,
     });
   }
 
@@ -294,6 +309,8 @@ export class MusicService {
     await player.playTrack({
       track: { encoded: track.encoded },
     });
+
+    recordTrackPlayed();
   }
 }
 

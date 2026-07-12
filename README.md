@@ -52,4 +52,20 @@ corepack pnpm install --ignore-scripts
 - Typecheck: `corepack pnpm typecheck`
 - Test: `corepack pnpm test`
 - Metrics: `http://localhost:3000/metrics`
+- Health (readiness): `http://localhost:3000/health` (200 when Discord and
+  Lavalink are connected, 503 otherwise)
 - EC2 deployment: [deploy/ec2/README.md](deploy/ec2/README.md)
+
+### Monitoring (optional)
+
+Prometheus + Grafana ship as an optional Compose profile that is **off by
+default** (it adds ~500 MB, which a 2 GB host may not have to spare). Start it
+alongside the bot with:
+
+```bash
+docker compose --profile observability up -d
+```
+
+Grafana is at `http://localhost:3001` (admin / `GRAFANA_PASSWORD`) with a
+pre-provisioned "ZyangBot Overview" dashboard; Prometheus scrapes the bot's
+`/metrics` on the internal network.

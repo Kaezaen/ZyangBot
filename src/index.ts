@@ -19,7 +19,10 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.InteractionCreate, handleInteraction);
 
 musicService.initialize(client);
-startMetricsServer(config.metricsPort);
+startMetricsServer(config.metricsPort, () => ({
+  discord: client.isReady(),
+  lavalink: musicService.isLavalinkConnected(),
+}));
 
 registerShutdownHandlers(async () => {
   // Stop accepting new work, then tear down from the outside in: voice
