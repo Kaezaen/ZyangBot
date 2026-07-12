@@ -102,6 +102,8 @@ Deployment
 Production
 
 - discord.js
+- shoukaku (Lavalink client)
+- prom-client (Prometheus metrics)
 - dotenv
 - zod
 - pino
@@ -217,11 +219,22 @@ Current Environment Variables
 NODE_ENV
 
 DISCORD_TOKEN
-
 CLIENT_ID
-
 GUILD_ID
+
+LAVALINK_NAME
+LAVALINK_URL
+LAVALINK_PASSWORD   (required, no default)
+
+SPOTIFY_CLIENT_ID       (optional)
+SPOTIFY_CLIENT_SECRET   (optional)
+
+LOG_LEVEL
+METRICS_PORT
 ```
+
+See `.env.example` for the full list, and `src/core/config/schema.ts` for
+validation rules.
 
 Configuration exported as
 
@@ -239,56 +252,43 @@ process.env.DISCORD_TOKEN
 
 # Current Progress
 
-Completed
+The project is well past its initial scaffold — it is a full, production-hardened
+music bot. `docs/ROADMAP.MD` is the authoritative phase status. In short:
 
-✅ Git
+✅ Tooling: Git/GitHub, pnpm, TypeScript (strict, ESM), Docker
 
-✅ GitHub
+✅ Config validation (Zod), Discord login, bot online
 
-✅ Docker
+✅ Slash commands (auto-discovered), interaction + button handling
 
-✅ pnpm
+✅ Music: Lavalink via Shoukaku, per-guild queue, Spotify via LavaSrc, lyrics
 
-✅ TypeScript
+✅ Player embeds + control buttons
 
-✅ ESLint
+✅ Docker Compose stack (verified) + EC2 deploy artifacts
 
-✅ Prettier
+✅ Pino logging + Prometheus metrics (`GET /metrics`)
 
-✅ Environment Validation
+✅ Hardening: crash guards, graceful shutdown, healthchecks, non-root
+   container, resource limits; a `node:test` suite (31 tests)
 
-✅ Discord Configuration
-
-✅ Discord Client Login
-
-✅ Bot Online
+Note: ESLint/Prettier are present as dev dependencies but **not yet
+configured** — there is no eslint config and no `lint` script.
 
 ---
 
 # Current Bot Status
 
-The bot successfully:
+The bot runs the full flow end-to-end (verified via `docker compose up`):
 
-- connects to Discord
-- logs in
-- reaches ClientReady event
-- appears online in Discord
+- connects to Discord and reaches ClientReady
+- connects to a Lavalink node through Shoukaku
+- serves every slash command and the music control buttons
+- exposes Prometheus metrics on `GET /metrics`
+- shuts down gracefully on SIGTERM/SIGINT
 
-Current client initialization is similar to
-
-```ts
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds
-    ]
-});
-
-client.once(Events.ClientReady, () => {
-
-});
-
-await client.login(config.discord.token);
-```
+Intents in use: `Guilds` and `GuildVoiceStates`
+(see `src/app/client/ZyangClient.ts`).
 
 ---
 
@@ -454,47 +454,11 @@ Do NOT combine these responsibilities.
 
 # Current Roadmap
 
-Completed
-
-✅ Environment
-
-✅ Configuration
-
-✅ Discord Login
-
-✅ Bot Online
-
-Current Milestone
-
-⬜ Slash Command Deployment
-
-⬜ /ping
-
-⬜ Interaction Handler
-
-Next
-
-⬜ Command Loader
-
-⬜ Automatic Command Discovery
-
-⬜ Music Module
-
-⬜ Lavalink
-
-⬜ Spotify Integration
-
-⬜ Queue System
-
-⬜ Player Controller
-
-⬜ Discord Embeds
-
-⬜ Buttons
-
-⬜ Docker Deployment
-
-⬜ AWS Deployment
+See `docs/ROADMAP.MD` for authoritative, up-to-date status. The foundation
+(Phases 1–8), logging, and metrics are complete, as is production hardening
+(process safety, deployment, and a test foundation). Remaining work lives in
+that file's backlog — e.g. metrics scraping, a `/health` readiness endpoint,
+`TrackStuckEvent` handling, and queue features.
 
 ---
 
@@ -588,41 +552,17 @@ When helping with this project:
 
 # Immediate Next Task
 
-Implement the first Slash Command.
+The foundation and hardening are done. Pick the next item from the backlog in
+`docs/ROADMAP.MD`. Strong candidates:
 
-Tasks:
+- Metrics scraping + a dashboard (nothing consumes `/metrics` yet).
+- A `/health` readiness endpoint that reflects Discord connectivity (the
+  current Docker healthcheck is liveness-only).
+- Handle `TrackStuckEvent` so a stuck track cannot freeze the queue.
 
-1. Create
-
-```
-src/commands/ping.ts
-```
-
-2. Create
-
-```
-src/deploy-commands.ts
-```
-
-3. Register Slash Command with Discord.
-
-4. Handle InteractionCreate event.
-
-5. Execute
-
-```ts
-pingCommand.execute(interaction)
-```
-
-Expected result
-
-```
-/ping
-
-↓
-
-🏓 Pong!
-```
+When adding, changing, or removing a command, remember to re-run
+`pnpm deploy:commands` (deploying commands and running the bot are separate
+processes).
 
 ---
 

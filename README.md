@@ -29,8 +29,17 @@ Docker. Slash commands are auto-discovered from `src/commands`.
    corepack pnpm deploy:commands
    ```
 
-For host-based development, start Lavalink separately, set
-`LAVALINK_URL=localhost:2333`, then run `corepack pnpm dev`.
+For host-based development, install dependencies, start Lavalink separately,
+set `LAVALINK_URL=localhost:2333`, then run `corepack pnpm dev`:
+
+```bash
+corepack pnpm install --ignore-scripts
+```
+
+> `--ignore-scripts` is needed on a fresh clone: pnpm v10+ otherwise
+> hard-fails the install on esbuild's (a `tsx` dependency) un-approved build
+> script. esbuild ships its binary via an optional dependency, so skipping
+> scripts is safe. Alternatively run `corepack pnpm approve-builds` once.
 
 ## Commands
 
@@ -41,5 +50,6 @@ For host-based development, start Lavalink separately, set
 
 - Build: `corepack pnpm build`
 - Typecheck: `corepack pnpm typecheck`
+- Test: `corepack pnpm test`
 - Metrics: `http://localhost:3000/metrics`
 - EC2 deployment: [deploy/ec2/README.md](deploy/ec2/README.md)
