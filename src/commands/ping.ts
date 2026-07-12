@@ -12,3 +12,5 @@ export const pingCommand = {
     await interaction.reply("🏓 Pong!");
   },
 };
+
+export default pingCommand;

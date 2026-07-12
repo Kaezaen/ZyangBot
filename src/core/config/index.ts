@@ -24,4 +24,14 @@ export const config = {
     clientId: env.CLIENT_ID,
     guildId: env.GUILD_ID,
   },
+
+  lavalink: {
+    name: env.LAVALINK_NAME,
+    url: env.LAVALINK_URL,
+    password: env.LAVALINK_PASSWORD,
+  },
+
+  logLevel: env.LOG_LEVEL,
+
+  metricsPort: env.METRICS_PORT,
 } as const;
