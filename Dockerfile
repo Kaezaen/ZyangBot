@@ -9,7 +9,7 @@ COPY package.json pnpm-lock.yaml ./
 # dependency (no script required), so skipping scripts is safe here.
 RUN corepack enable && corepack pnpm install --frozen-lockfile --ignore-scripts
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN corepack pnpm build
 

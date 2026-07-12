@@ -1,16 +1,12 @@
 import type { Client } from "discord.js";
-import {
-  Connectors,
-  LoadType,
-  type Player,
-  Shoukaku,
-  type Track as LavalinkTrack,
-} from "shoukaku";
+import { Connectors, type Player, Shoukaku } from "shoukaku";
 import { config } from "../../core/config/index.js";
 import { logger } from "../../core/logger/index.js";
 import { setActiveMusicQueues } from "../../services/metrics.js";
 import { GuildQueue } from "./guildQueue.js";
+import { attachQueueAdvancement } from "./playerEvents.js";
 import type { Track } from "./track.js";
+import { toTracks } from "./trackResolver.js";
 
 type JoinInput = {
   guildId: string;
@@ -98,7 +94,11 @@ export class MusicService {
     }
 
     const response = await node.rest.resolve(input.query);
-    const resolvedTracks = this.toTracks(response?.loadType, response?.data, input);
+    const resolvedTracks = toTracks(
+      response?.loadType,
+      response?.data,
+      input.requestedByUserId,
+    );
 
     if (resolvedTracks.length === 0) {
       throw new Error("No tracks found for that query.");
@@ -263,26 +263,8 @@ export class MusicService {
 
     this.attachedPlayers.add(player.guildId);
 
-    // `end` is the single source of truth for advancing the queue. Lavalink
-    // emits it for every track that stops, and the reason tells us whether to
-    // move on:
-    //   - finished / loadFailed -> the track is done, play the next one
-    //   - stopped / replaced / cleanup -> we triggered it (skip/stop), and that
-    //     handler already manages the queue, so we must not advance here
-    player.on("end", (event) => {
-      if (event.reason === "finished" || event.reason === "loadFailed") {
-        void this.handleTrackEnd(player.guildId);
-      }
-    });
-
-    // `exception` is informational only. A failing track ALSO emits `end` with
-    // reason "loadFailed", which is what advances the queue. Advancing here as
-    // well would skip the following track (double-advance), so we only log.
-    player.on("exception", (event) => {
-      logger.error(
-        { guildId: player.guildId, exception: event.exception },
-        "Lavalink player exception",
-      );
+    attachQueueAdvancement(player, () => {
+      void this.handleTrackEnd(player.guildId);
     });
   }
 
@@ -312,61 +294,6 @@ export class MusicService {
     await player.playTrack({
       track: { encoded: track.encoded },
     });
-  }
-
-  private toTracks(
-    loadType: LoadType | undefined,
-    data: unknown,
-    input: EnqueueInput,
-  ): Track[] {
-    const lavalinkTracks = this.extractTracks(loadType, data);
-
-    return lavalinkTracks.map((track) => ({
-      encoded: track.encoded,
-      title: track.info.title,
-      author: track.info.author,
-      durationMs: track.info.length,
-      requestedByUserId: input.requestedByUserId,
-      ...(track.info.uri ? { sourceUrl: track.info.uri } : {}),
-    }));
-  }
-
-  private extractTracks(
-    loadType: LoadType | undefined,
-    data: unknown,
-  ): LavalinkTrack[] {
-    if (loadType === LoadType.TRACK && this.isTrack(data)) {
-      return [data];
-    }
-
-    if (loadType === LoadType.SEARCH && Array.isArray(data)) {
-      return data.filter(this.isTrack);
-    }
-
-    if (loadType === LoadType.PLAYLIST && this.isPlaylist(data)) {
-      return data.tracks;
-    }
-
-    return [];
-  }
-
-  private isTrack(value: unknown): value is LavalinkTrack {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      "encoded" in value &&
-      "info" in value
-    );
-  }
-
-  private isPlaylist(value: unknown): value is { tracks: LavalinkTrack[] } {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      "tracks" in value &&
-      Array.isArray(value.tracks) &&
-      value.tracks.every(this.isTrack)
-    );
   }
 }
 
