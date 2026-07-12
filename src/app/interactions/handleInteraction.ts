@@ -10,7 +10,16 @@ import { handleMusicControl } from "./handleMusicControl.js";
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
   if (interaction.isButton() && interaction.customId.startsWith("music:")) {
-    await handleMusicControl(interaction);
+    try {
+      await handleMusicControl(interaction);
+    } catch (error) {
+      // A failed button reply (expired/duplicate interaction) must never
+      // escape and crash the process — it previously took the whole bot down.
+      logger.error(
+        { err: error, customId: interaction.customId, guildId: interaction.guildId },
+        "Music control failed",
+      );
+    }
     return;
   }
 

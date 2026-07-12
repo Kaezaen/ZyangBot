@@ -1,10 +1,11 @@
 import {
   type ChatInputCommandInteraction,
+  MessageFlags,
   SlashCommandBuilder,
 } from "discord.js";
 import { logger } from "../core/logger/index.js";
 import { musicService } from "../modules/music/musicService.js";
-import { formatDuration } from "../shared/formatDuration.js";
+import { playerCardManager } from "../modules/music/playerCardManager.js";
 
 export const playCommand = {
   data: new SlashCommandBuilder()
@@ -18,10 +19,10 @@ export const playCommand = {
     ),
 
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.guild) {
+    if (!interaction.guild || !interaction.channelId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -32,37 +33,30 @@ export const playCommand = {
     if (!voiceChannel) {
       await interaction.reply({
         content: "Join a voice channel first.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
     const query = interaction.options.getString("query", true);
-    await interaction.deferReply();
+
+    // The Player Card is the UI: acknowledge privately, then let the card speak.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    // The card lives in the channel where /play was invoked.
+    playerCardManager.bind(interaction.guild.id, interaction.channelId);
 
     try {
-      const result = await musicService.enqueue({
+      await musicService.enqueue({
         guildId: interaction.guild.id,
         channelId: voiceChannel.id,
         shardId: interaction.guild.shardId,
         query,
         requestedByUserId: interaction.user.id,
       });
-      const firstTrack = result.addedTracks[0];
 
-      if (!firstTrack) {
-        throw new Error("Lavalink returned no playable tracks.");
-      }
-
-      const playbackMessage = result.startedPlayback
-        ? `Now playing **${firstTrack.title}** — ${formatDuration(firstTrack.durationMs)}`
-        : `Added **${firstTrack.title}** to the queue.`;
-      const playlistMessage =
-        result.addedTracks.length > 1
-          ? ` Added ${result.addedTracks.length} tracks.`
-          : "";
-
-      await interaction.editReply(`${playbackMessage}${playlistMessage}`);
+      // Remove the private ack; the persistent Player Card is the response.
+      await interaction.deleteReply();
     } catch (error) {
       logger.error(
         { err: error, guildId: interaction.guild.id, query },

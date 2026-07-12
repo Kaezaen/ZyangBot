@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { LoadType } from "shoukaku";
-import { extractTracks, isPlaylist, isTrack, toTracks } from "./trackResolver.js";
+import {
+  extractTracks,
+  isPlaylist,
+  isTrack,
+  normalizeQuery,
+  toTracks,
+} from "./trackResolver.js";
 
 function lavalinkTrack(
   info: Record<string, unknown> = {},
@@ -50,9 +56,14 @@ describe("extractTracks", () => {
     assert.deepEqual(extractTracks(LoadType.TRACK, { bad: true }), []);
   });
 
-  it("filters SEARCH results to valid tracks only", () => {
-    const good = lavalinkTrack();
-    assert.deepEqual(extractTracks(LoadType.SEARCH, [good, { bad: true }]), [good]);
+  it("returns only the first valid SEARCH result", () => {
+    const first = lavalinkTrack({ title: "First" });
+    const second = lavalinkTrack({ title: "Second" });
+
+    const result = extractTracks(LoadType.SEARCH, [{ bad: true }, first, second]);
+
+    assert.equal(result.length, 1);
+    assert.equal(result[0]?.info.title, "First");
   });
 
   it("returns playlist tracks for PLAYLIST", () => {
@@ -70,9 +81,38 @@ describe("extractTracks", () => {
   });
 });
 
+describe("normalizeQuery", () => {
+  it("passes through http/https URLs", () => {
+    assert.equal(normalizeQuery("https://youtu.be/abc"), "https://youtu.be/abc");
+  });
+
+  it("passes through Spotify URLs and URIs", () => {
+    assert.equal(
+      normalizeQuery("https://open.spotify.com/track/x"),
+      "https://open.spotify.com/track/x",
+    );
+    assert.equal(normalizeQuery("spotify:track:x"), "spotify:track:x");
+  });
+
+  it("passes through explicit search prefixes", () => {
+    assert.equal(normalizeQuery("ytsearch:hello"), "ytsearch:hello");
+    assert.equal(normalizeQuery("scsearch:hello"), "scsearch:hello");
+  });
+
+  it("turns plain text into a YouTube search and trims it", () => {
+    assert.equal(
+      normalizeQuery("  never gonna give you up  "),
+      "ytsearch:never gonna give you up",
+    );
+  });
+});
+
 describe("toTracks", () => {
   it("maps Lavalink info onto the internal Track shape", () => {
-    const data = lavalinkTrack({ uri: "https://example.com/song" });
+    const data = lavalinkTrack({
+      uri: "https://example.com/song",
+      artworkUrl: "https://example.com/art.jpg",
+    });
 
     const [track] = toTracks(LoadType.TRACK, data, "user-9");
 
@@ -84,6 +124,7 @@ describe("toTracks", () => {
       durationMs: 1_000,
       requestedByUserId: "user-9",
       sourceUrl: "https://example.com/song",
+      thumbnailUrl: "https://example.com/art.jpg",
     });
   });
 

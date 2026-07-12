@@ -8,10 +8,11 @@ import {
   setActiveMusicQueues,
   setLavalinkConnected,
 } from "../../services/metrics.js";
+import type { PlayerCardTrack, PlayerView } from "../../ui/playerCard.js";
 import { GuildQueue } from "./guildQueue.js";
 import { attachQueueAdvancement } from "./playerEvents.js";
 import type { Track } from "./track.js";
-import { toTracks } from "./trackResolver.js";
+import { normalizeQuery, toTracks } from "./trackResolver.js";
 
 type JoinInput = {
   guildId: string;
@@ -29,11 +30,26 @@ export type EnqueueResult = {
   startedPlayback: boolean;
 };
 
+/** Emitted whenever the persistent Player Card should be re-rendered. */
+export type PlayerCardUpdate = { guildId: string; view: PlayerView };
+
+function toPlayerCardTrack(track: Track): PlayerCardTrack {
+  return {
+    title: track.title,
+    author: track.author,
+    durationMs: track.durationMs,
+    ...(track.sourceUrl ? { sourceUrl: track.sourceUrl } : {}),
+    ...(track.thumbnailUrl ? { thumbnailUrl: track.thumbnailUrl } : {}),
+  };
+}
+
 export class MusicService {
   private readonly queues = new Map<string, GuildQueue>();
   private readonly attachedPlayers = new Set<string>();
   private shoukaku: Shoukaku | undefined;
   private lavalinkConnected = false;
+  private readonly lastTracks = new Map<string, Track>();
+  private updateListener: ((update: PlayerCardUpdate) => void) | undefined;
 
   initialize(client: Client): void {
     if (this.shoukaku) {
@@ -92,6 +108,8 @@ export class MusicService {
     this.queues.delete(guildId);
     this.attachedPlayers.delete(guildId);
     setActiveMusicQueues(this.queues.size);
+    this.emit(guildId, this.disconnectedView("Left the voice channel."));
+    this.lastTracks.delete(guildId);
 
     return true;
   }
@@ -103,7 +121,7 @@ export class MusicService {
       throw new Error("No Lavalink node is available.");
     }
 
-    const response = await node.rest.resolve(input.query);
+    const response = await node.rest.resolve(normalizeQuery(input.query));
     const resolvedTracks = toTracks(
       response?.loadType,
       response?.data,
@@ -127,6 +145,11 @@ export class MusicService {
       await this.playCurrent(input.guildId);
     }
 
+    const view = this.activeView(input.guildId);
+    if (view) {
+      this.emit(input.guildId, view);
+    }
+
     return {
       addedTracks: resolvedTracks,
       startedPlayback: shouldStartPlayback,
@@ -141,6 +164,12 @@ export class MusicService {
     }
 
     await player.setPaused(true);
+
+    const view = this.activeView(guildId);
+    if (view) {
+      this.emit(guildId, view);
+    }
+
     return true;
   }
 
@@ -152,6 +181,12 @@ export class MusicService {
     }
 
     await player.setPaused(false);
+
+    const view = this.activeView(guildId);
+    if (view) {
+      this.emit(guildId, view);
+    }
+
     return true;
   }
 
@@ -167,8 +202,16 @@ export class MusicService {
 
     if (queue.current) {
       await this.playCurrent(guildId);
+      const view = this.activeView(guildId);
+      if (view) {
+        this.emit(guildId, view);
+      }
     } else {
       await player.stopTrack();
+      this.emit(
+        guildId,
+        this.finishedView(guildId, "Playback finished — the queue is empty."),
+      );
     }
 
     return skippedTrack;
@@ -184,6 +227,7 @@ export class MusicService {
 
     queue.clear();
     await player.stopTrack();
+    this.emit(guildId, this.finishedView(guildId, "Playback stopped."));
 
     return true;
   }
@@ -207,6 +251,69 @@ export class MusicService {
     return this.lavalinkConnected;
   }
 
+  /** Registers the single listener that renders the persistent Player Card. */
+  onPlayerUpdate(listener: (update: PlayerCardUpdate) => void): void {
+    this.updateListener = listener;
+  }
+
+  /** Re-emits the current view so the Player Card can be re-summoned. */
+  refresh(guildId: string): boolean {
+    const view = this.activeView(guildId);
+
+    if (!view) {
+      return false;
+    }
+
+    this.emit(guildId, view);
+    return true;
+  }
+
+  private emit(guildId: string, view: PlayerView): void {
+    this.updateListener?.({ guildId, view });
+  }
+
+  private voiceChannelId(guildId: string): string | undefined {
+    return this.shoukaku?.connections.get(guildId)?.channelId ?? undefined;
+  }
+
+  /** The playing/paused view for the current track, or undefined if none. */
+  private activeView(guildId: string): PlayerView | undefined {
+    const queue = this.getQueue(guildId);
+    const track = queue?.current;
+    const player = this.shoukaku?.players.get(guildId);
+
+    if (!track || !player) {
+      return undefined;
+    }
+
+    const voiceChannelId = this.voiceChannelId(guildId);
+
+    return {
+      state: player.paused ? "paused" : "playing",
+      track: toPlayerCardTrack(track),
+      positionMs: player.position,
+      requestedByUserId: track.requestedByUserId,
+      ...(voiceChannelId ? { voiceChannelId } : {}),
+      queueSize: Math.max(0, queue.items.length - 1),
+    };
+  }
+
+  private finishedView(guildId: string, reason: string): PlayerView {
+    const last = this.lastTracks.get(guildId);
+
+    return {
+      state: "queueFinished",
+      ...(last ? { track: toPlayerCardTrack(last) } : {}),
+      positionMs: last?.durationMs ?? 0,
+      queueSize: 0,
+      reason,
+    };
+  }
+
+  private disconnectedView(reason: string): PlayerView {
+    return { state: "disconnected", positionMs: 0, queueSize: 0, reason };
+  }
+
   /**
    * Disconnects every active voice connection and clears all in-memory state.
    * Called during graceful shutdown so Discord sees the bot leave immediately
@@ -226,6 +333,7 @@ export class MusicService {
 
     this.queues.clear();
     this.attachedPlayers.clear();
+    this.lastTracks.clear();
     setActiveMusicQueues(0);
   }
 
@@ -294,6 +402,15 @@ export class MusicService {
 
     if (queue.current) {
       await this.playCurrent(guildId);
+      const view = this.activeView(guildId);
+      if (view) {
+        this.emit(guildId, view);
+      }
+    } else {
+      this.emit(
+        guildId,
+        this.finishedView(guildId, "Playback finished — the queue is empty."),
+      );
     }
   }
 
@@ -310,6 +427,7 @@ export class MusicService {
       track: { encoded: track.encoded },
     });
 
+    this.lastTracks.set(guildId, track);
     recordTrackPlayed();
   }
 }

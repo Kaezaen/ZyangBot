@@ -4,5 +4,6 @@ export type Track = {
   author: string;
   durationMs: number;
   sourceUrl?: string;
+  thumbnailUrl?: string;
   requestedByUserId: string;
 };

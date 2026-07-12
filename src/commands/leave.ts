@@ -1,5 +1,6 @@
 import {
   type ChatInputCommandInteraction,
+  MessageFlags,
   SlashCommandBuilder,
 } from "discord.js";
 import { musicService } from "../modules/music/musicService.js";
@@ -13,18 +14,18 @@ export const leaveCommand = {
     if (!interaction.guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
     const leftVoiceChannel = await musicService.leave(interaction.guildId);
-
-    await interaction.reply(
-      leftVoiceChannel
+    await interaction.reply({
+      content: leftVoiceChannel
         ? "Left the voice channel."
         : "I am not connected to a voice channel.",
-    );
+      flags: MessageFlags.Ephemeral,
+    });
   },
 };
 

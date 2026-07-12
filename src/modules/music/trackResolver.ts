@@ -7,6 +7,26 @@ import type { Track } from "./track.js";
  * without a live Lavalink node.
  */
 
+/**
+ * Prepares a user query for Lavalink. URLs (including Spotify) and explicit
+ * source prefixes (`ytsearch:`, `spsearch:`, ...) are passed through untouched
+ * so Lavalink/LavaSrc resolves them directly. Plain text becomes a YouTube
+ * search, so a user can type a song title instead of a link.
+ */
+export function normalizeQuery(query: string): string {
+  const trimmed = query.trim();
+
+  if (
+    /^https?:\/\//i.test(trimmed) ||
+    /^[a-z]+search:/i.test(trimmed) ||
+    /^spotify:/i.test(trimmed)
+  ) {
+    return trimmed;
+  }
+
+  return `ytsearch:${trimmed}`;
+}
+
 export function isTrack(value: unknown): value is LavalinkTrack {
   return (
     typeof value === "object" &&
@@ -37,7 +57,9 @@ export function extractTracks(
   }
 
   if (loadType === LoadType.SEARCH && Array.isArray(data)) {
-    return data.filter(isTrack);
+    // A search returns many matches; queue only the best (first) one.
+    const first = data.find(isTrack);
+    return first ? [first] : [];
   }
 
   if (loadType === LoadType.PLAYLIST && isPlaylist(data)) {
@@ -59,5 +81,8 @@ export function toTracks(
     durationMs: track.info.length,
     requestedByUserId,
     ...(track.info.uri ? { sourceUrl: track.info.uri } : {}),
+    ...(track.info.artworkUrl
+      ? { thumbnailUrl: track.info.artworkUrl }
+      : {}),
   }));
 }

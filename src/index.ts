@@ -8,6 +8,7 @@ import {
   registerShutdownHandlers,
 } from "./core/process/index.js";
 import { musicService } from "./modules/music/musicService.js";
+import { playerCardManager } from "./modules/music/playerCardManager.js";
 import { startMetricsServer, stopMetricsServer } from "./services/metrics.js";
 
 registerCrashGuards();
@@ -19,6 +20,8 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.InteractionCreate, handleInteraction);
 
 musicService.initialize(client);
+playerCardManager.attach(client);
+musicService.onPlayerUpdate((update) => playerCardManager.handleUpdate(update));
 startMetricsServer(config.metricsPort, () => ({
   discord: client.isReady(),
   lavalink: musicService.isLavalinkConnected(),
