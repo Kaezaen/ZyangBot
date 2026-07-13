@@ -12,7 +12,9 @@ export class LyricsService {
       track_name: track.title,
       artist_name: track.author,
     });
-    const response = await fetch(`https://lrclib.net/api/get?${query}`);
+    const response = await fetch(`https://lrclib.net/api/get?${query}`, {
+      signal: AbortSignal.timeout(5_000),
+    });
 
     if (!response.ok) {
       return undefined;
@@ -24,7 +26,9 @@ export class LyricsService {
       return undefined;
     }
 
-    return parsed.data.syncedLyrics ?? parsed.data.plainLyrics ?? undefined;
+    // Prefer plain lyrics for display (synced lyrics carry [mm:ss] timestamps,
+    // which are for the future real-time view, not plain reading).
+    return parsed.data.plainLyrics ?? parsed.data.syncedLyrics ?? undefined;
   }
 }
 

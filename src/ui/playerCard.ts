@@ -157,12 +157,11 @@ function buildActionRow(
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(controlsDisabled);
 
-  // Lyrics is a disabled placeholder for the MVP (spec).
   const lyrics = new ButtonBuilder()
     .setCustomId(PlayerButtonId.lyrics)
     .setLabel("Lyrics")
     .setStyle(ButtonStyle.Secondary)
-    .setDisabled(true);
+    .setDisabled(controlsDisabled);
 
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(

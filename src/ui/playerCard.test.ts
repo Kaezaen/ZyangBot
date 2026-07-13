@@ -66,18 +66,20 @@ describe("buildPlayerCard", () => {
     );
   });
 
-  it("keeps the button order fixed with Lyrics disabled", () => {
-    const ids = buttons(buildPlayerCard(view())).map((b) => b.custom_id);
-    assert.deepEqual(ids, [
-      PlayerButtonId.pause,
-      PlayerButtonId.skip,
-      PlayerButtonId.stop,
-      PlayerButtonId.queue,
-      PlayerButtonId.lyrics,
-    ]);
+  it("keeps the button order fixed and enables controls while playing", () => {
+    const rendered = buttons(buildPlayerCard(view()));
+    assert.deepEqual(
+      rendered.map((b) => b.custom_id),
+      [
+        PlayerButtonId.pause,
+        PlayerButtonId.skip,
+        PlayerButtonId.stop,
+        PlayerButtonId.queue,
+        PlayerButtonId.lyrics,
+      ],
+    );
 
-    const lyrics = buttons(buildPlayerCard(view())).at(-1);
-    assert.equal(lyrics?.disabled, true);
+    assert.ok(rendered.every((b) => b.disabled === false));
   });
 
   it("swaps Pause for Resume when paused", () => {

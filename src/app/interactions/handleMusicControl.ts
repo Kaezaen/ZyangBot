@@ -1,5 +1,8 @@
 import { type ButtonInteraction, MessageFlags } from "discord.js";
+import { logger } from "../../core/logger/index.js";
+import { lyricsService } from "../../modules/music/lyricsService.js";
 import { musicService } from "../../modules/music/musicService.js";
+import { buildLyricsCard } from "../../ui/lyricsCard.js";
 
 const QUEUE_PREVIEW_LIMIT = 15;
 
@@ -40,13 +43,43 @@ export async function handleMusicControl(
       });
       return;
     case "music:lyrics":
-      await interaction.reply({
-        content: "Lyrics are coming soon.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await showLyrics(interaction, guildId);
       return;
     default:
       return;
+  }
+}
+
+/** Shows the current track's lyrics as a private (ephemeral) Lyrics card. */
+async function showLyrics(
+  interaction: ButtonInteraction,
+  guildId: string,
+): Promise<void> {
+  const track = musicService.getQueue(guildId)?.current;
+
+  if (!track) {
+    await interaction.reply({
+      content: "Nothing is playing.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Fetching lyrics is a network call; acknowledge privately first.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  try {
+    const lyrics = await lyricsService.findForTrack(track);
+
+    if (!lyrics) {
+      await interaction.editReply("No lyrics were found for the current track.");
+      return;
+    }
+
+    await interaction.editReply(buildLyricsCard(track, lyrics));
+  } catch (error) {
+    logger.warn({ err: error, title: track.title }, "Lyrics lookup failed");
+    await interaction.editReply("Could not load lyrics right now.");
   }
 }
 
