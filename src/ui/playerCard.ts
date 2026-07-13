@@ -50,9 +50,6 @@ export type CardMessage = {
   components: ActionRowBuilder<ButtonBuilder>[];
 };
 
-/** The one music icon, used consistently in every header (spec-permitted). */
-const MUSIC_ICON = "🎵";
-
 const HEADERS: Record<PlayerCardState, string> = {
   playing: "Now Playing",
   paused: "Paused",
@@ -114,7 +111,11 @@ function buildFields(view: PlayerView): APIEmbedField[] | undefined {
       value: view.voiceChannelId ? `<#${view.voiceChannelId}>` : "—",
       inline: true,
     },
-    { name: "Queue", value: String(view.queueSize), inline: true },
+    {
+      name: "Queue",
+      value: `${view.queueSize} ${view.queueSize === 1 ? "Track" : "Tracks"}`,
+      inline: true,
+    },
   ];
 }
 
@@ -131,22 +132,23 @@ function buildActionRow(
   const paused = view.state === "paused";
 
   // Fixed order forever (spec): Pause/Resume, Skip, Stop, Queue, Lyrics.
+  // The first button is the primary (green) action; the rest are secondary.
   const pauseResume = new ButtonBuilder()
     .setCustomId(paused ? PlayerButtonId.resume : PlayerButtonId.pause)
     .setLabel(paused ? "Resume" : "Pause")
-    .setStyle(paused ? ButtonStyle.Success : ButtonStyle.Secondary)
+    .setStyle(ButtonStyle.Success)
     .setDisabled(controlsDisabled);
 
   const skip = new ButtonBuilder()
     .setCustomId(PlayerButtonId.skip)
     .setLabel("Skip")
-    .setStyle(ButtonStyle.Primary)
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(controlsDisabled);
 
   const stop = new ButtonBuilder()
     .setCustomId(PlayerButtonId.stop)
     .setLabel("Stop")
-    .setStyle(ButtonStyle.Danger)
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(controlsDisabled);
 
   const queue = new ButtonBuilder()
@@ -196,7 +198,7 @@ export function buildPlayerCard(view: PlayerView): CardMessage {
 
   const section: CardSection = {
     color: colorFor(view.state),
-    author: { name: `${MUSIC_ICON} ${HEADERS[view.state]}` },
+    author: { name: HEADERS[view.state] },
     ...(showTitle && view.track ? { title: view.track.title } : {}),
     ...(showTitle && view.track?.sourceUrl ? { url: view.track.sourceUrl } : {}),
     ...(description ? { description } : {}),

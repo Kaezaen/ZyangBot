@@ -36,8 +36,8 @@ describe("isPlaylist", () => {
     assert.equal(isPlaylist({ tracks: [lavalinkTrack(), lavalinkTrack()] }), true);
   });
 
-  it("rejects when any entry is not a track", () => {
-    assert.equal(isPlaylist({ tracks: [lavalinkTrack(), { nope: true }] }), false);
+  it("accepts a mixed tracks array (per-track validation happens later)", () => {
+    assert.equal(isPlaylist({ tracks: [lavalinkTrack(), { nope: true }] }), true);
   });
 
   it("rejects when tracks is missing or not an array", () => {
@@ -71,7 +71,21 @@ describe("extractTracks", () => {
     assert.deepEqual(extractTracks(LoadType.PLAYLIST, { tracks }), tracks);
   });
 
-  it("returns [] for an invalid playlist", () => {
+  it("keeps only the valid tracks in a playlist (skips unresolvable ones)", () => {
+    const good1 = lavalinkTrack({ title: "A" });
+    const good2 = lavalinkTrack({ title: "B" });
+
+    const result = extractTracks(LoadType.PLAYLIST, {
+      tracks: [good1, { bad: true }, good2],
+    });
+
+    assert.deepEqual(
+      result.map((t) => t.info.title),
+      ["A", "B"],
+    );
+  });
+
+  it("returns [] for a playlist with no valid tracks", () => {
     assert.deepEqual(extractTracks(LoadType.PLAYLIST, { tracks: [{ bad: true }] }), []);
   });
 

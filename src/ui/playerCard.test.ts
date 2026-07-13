@@ -61,7 +61,7 @@ describe("buildPlayerCard", () => {
       [
         ["Requested by", "<@111>"],
         ["Voice", "<#222>"],
-        ["Queue", "5"],
+        ["Queue", "5 Tracks"],
       ],
     );
   });

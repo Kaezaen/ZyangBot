@@ -11,7 +11,7 @@ lavalink:
   plugins:
     - dependency: "dev.lavalink.youtube:youtube-plugin:1.16.0"
       snapshot: false
-    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.1"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
       repository: "https://maven.lavalink.dev/releases"
       snapshot: false
 
@@ -30,4 +30,10 @@ plugins:
     spotify:
       clientId: ${SPOTIFY_CLIENT_ID:}
       clientSecret: ${SPOTIFY_CLIENT_SECRET:}
+      # NOTE: Spotify playlists do not resolve with a newly-created app — the
+      # anonymous-token path is TOTP-protected and returns 401, and client
+      # credentials cannot read playlists. A fix requires `customTokenEndpoint`
+      # (a fragile external token service) — deferred. Single tracks + search
+      # + YouTube (incl. playlists) work. `spDc` (Spotify lyrics) is a separate
+      # option for the lyrics feature.
       countryCode: ID

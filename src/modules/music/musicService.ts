@@ -129,6 +129,10 @@ export class MusicService {
     );
 
     if (resolvedTracks.length === 0) {
+      logger.warn(
+        { query: input.query, loadType: response?.loadType },
+        "Query resolved to no playable tracks",
+      );
       throw new Error("No tracks found for that query.");
     }
 

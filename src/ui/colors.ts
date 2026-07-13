@@ -11,5 +11,5 @@ export const Colors = {
   /** Warnings and terminal-but-fine states (e.g. Queue Finished). */
   warning: 0xdccfc0,
   /** Errors — a soft, muted red (never bright red). */
-  error: 0xc97c7c,
+  error: 0xe57373,
 } as const;

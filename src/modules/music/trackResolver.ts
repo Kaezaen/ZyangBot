@@ -36,15 +36,15 @@ export function isTrack(value: unknown): value is LavalinkTrack {
   );
 }
 
-export function isPlaylist(
-  value: unknown,
-): value is { tracks: LavalinkTrack[] } {
+export function isPlaylist(value: unknown): value is { tracks: unknown[] } {
+  // Only validate the shape (a tracks array). Individual tracks are validated
+  // in extractTracks, so a playlist with a few unresolvable entries (common with
+  // Spotify) still plays its valid tracks instead of failing entirely.
   return (
     typeof value === "object" &&
     value !== null &&
     "tracks" in value &&
-    Array.isArray(value.tracks) &&
-    value.tracks.every(isTrack)
+    Array.isArray(value.tracks)
   );
 }
 
@@ -63,7 +63,7 @@ export function extractTracks(
   }
 
   if (loadType === LoadType.PLAYLIST && isPlaylist(data)) {
-    return data.tracks;
+    return data.tracks.filter(isTrack);
   }
 
   return [];
