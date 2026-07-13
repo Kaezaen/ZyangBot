@@ -1,28 +1,24 @@
-const LINE = "━";
-const KNOB = "◉";
+const FILLED = "▰";
+const EMPTY = "▱";
 
 /**
- * The ZyangBot signature progress bar: a clean line with a single knob marking
- * the current position, e.g. `━━━━━━━━━━━━◉━━━━━━`. This is the one and only
- * progress-bar style — reused by every card so it stays recognizable.
+ * The ZyangBot progress bar: a clean filled/empty pill bar, e.g.
+ * `▰▰▰▰▰▰▱▱▱▱▱▱`. The filled portion is proportional to playback position, so
+ * it reads as progress at a glance. Reused by every card for consistency.
  *
  * Pure and snapshot-based: it renders the position at call time (it does not
- * tick on its own).
+ * tick on its own). For a smoother, colored bar Discord requires custom emojis
+ * or a generated image — this is the native text-only version.
  */
 export function renderProgressBar(
   positionMs: number,
   durationMs: number,
-  length = 18,
+  length = 16,
 ): string {
   const total = Math.max(1, length);
+  const ratio =
+    durationMs <= 0 ? 0 : Math.min(1, Math.max(0, positionMs / durationMs));
+  const filled = Math.round(ratio * total);
 
-  // Unknown/zero duration (e.g. live streams): show the knob at the start.
-  if (durationMs <= 0) {
-    return KNOB + LINE.repeat(total - 1);
-  }
-
-  const ratio = Math.min(1, Math.max(0, positionMs / durationMs));
-  const knobIndex = Math.round(ratio * (total - 1));
-
-  return LINE.repeat(knobIndex) + KNOB + LINE.repeat(total - 1 - knobIndex);
+  return FILLED.repeat(filled) + EMPTY.repeat(total - filled);
 }

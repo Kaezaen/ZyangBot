@@ -2,31 +2,35 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderProgressBar } from "./progressBar.js";
 
+const FILLED = "▰";
+const EMPTY = "▱";
+
 describe("renderProgressBar", () => {
-  it("keeps a constant total length with exactly one knob", () => {
+  it("keeps a constant total length", () => {
     for (const pos of [0, 25, 50, 75, 100]) {
-      const bar = renderProgressBar(pos, 100, 18);
-      assert.equal([...bar].length, 18);
-      assert.equal((bar.match(/◉/g) ?? []).length, 1);
+      assert.equal([...renderProgressBar(pos, 100, 16)].length, 16);
     }
   });
 
-  it("puts the knob at the start at position 0", () => {
-    assert.ok(renderProgressBar(0, 100, 10).startsWith("◉"));
+  it("is fully empty at position 0", () => {
+    assert.equal(renderProgressBar(0, 100, 10), EMPTY.repeat(10));
   });
 
-  it("puts the knob at the end at full position", () => {
-    assert.ok(renderProgressBar(100, 100, 10).endsWith("◉"));
+  it("is fully filled at the end", () => {
+    assert.equal(renderProgressBar(100, 100, 10), FILLED.repeat(10));
+  });
+
+  it("fills proportionally to position", () => {
+    const bar = renderProgressBar(50, 100, 10);
+    assert.equal(bar, `${FILLED.repeat(5)}${EMPTY.repeat(5)}`);
   });
 
   it("clamps out-of-range positions", () => {
-    assert.ok(renderProgressBar(-50, 100, 10).startsWith("◉"));
-    assert.ok(renderProgressBar(500, 100, 10).endsWith("◉"));
+    assert.equal(renderProgressBar(-50, 100, 8), EMPTY.repeat(8));
+    assert.equal(renderProgressBar(500, 100, 8), FILLED.repeat(8));
   });
 
-  it("handles unknown duration (streams) without dividing by zero", () => {
-    const bar = renderProgressBar(1000, 0, 12);
-    assert.equal([...bar].length, 12);
-    assert.ok(bar.startsWith("◉"));
+  it("shows an empty bar for unknown duration (streams)", () => {
+    assert.equal(renderProgressBar(1000, 0, 12), EMPTY.repeat(12));
   });
 });

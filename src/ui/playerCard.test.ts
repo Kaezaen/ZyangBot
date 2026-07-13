@@ -49,7 +49,7 @@ describe("buildPlayerCard", () => {
     assert.equal(embed?.url, "https://example.com/track");
     assert.equal(embed?.thumbnail?.url, "https://example.com/art.jpg");
     assert.ok(embed?.description?.includes("Eminem"));
-    assert.ok(embed?.description?.includes("◉"), "shows the progress bar");
+    assert.ok(embed?.description?.includes("▰"), "shows the progress bar");
   });
 
   it("shows metadata fields for active playback", () => {
@@ -92,7 +92,7 @@ describe("buildPlayerCard", () => {
   it("disables controls while loading and hides progress", () => {
     const card = buildPlayerCard(view({ state: "loading" }));
     assert.ok(card.embeds[0]?.data.author?.name?.includes("Loading"));
-    assert.ok(!card.embeds[0]?.data.description?.includes("◉"));
+    assert.ok(!card.embeds[0]?.data.description?.includes("▱"));
     assert.ok(buttons(card).every((b) => b.disabled === true));
   });
 
